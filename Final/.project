@@ -25,16 +25,10 @@
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>uartstdio.c</name>
-			<type>1</type>
-			<locationURI>PARENT-2-PROJECT_LOC/ti/tivaware_c_series_2_1_4_178/utils/uartstdio.c</locationURI>
-		</link>
-		<link>
-			<name>uartstdio.h</name>
-			<type>1</type>
-			<locationURI>PARENT-2-PROJECT_LOC/ti/tivaware_c_series_2_1_4_178/utils/uartstdio.h</locationURI>
-		</link>
-	</linkedResources>
+	<variableList>
+		<variable>
+			<name>ORIGINAL_PROJECT_ROOT</name>
+			<value>file:/C:/TivaC_workspace/Robot_Proj_RTOS_Version/Final</value>
+		</variable>
+	</variableList>
 </projectDescription>

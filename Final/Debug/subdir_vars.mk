@@ -11,18 +11,15 @@ CFG_SRCS += \
 
 C_SRCS += \
 ../EK_TM4C123GXL.c \
-../main.c \
-C:/ti/tivaware_c_series_2_1_4_178/utils/uartstdio.c 
+../main.c 
 
 OBJS += \
 ./EK_TM4C123GXL.obj \
-./main.obj \
-./uartstdio.obj 
+./main.obj 
 
 C_DEPS += \
 ./EK_TM4C123GXL.d \
-./main.d \
-./uartstdio.d 
+./main.d 
 
 GEN_MISC_DIRS += \
 ./configPkg/ 
@@ -46,17 +43,14 @@ GEN_MISC_DIRS__QUOTED += \
 
 C_DEPS__QUOTED += \
 "EK_TM4C123GXL.d" \
-"main.d" \
-"uartstdio.d" 
+"main.d" 
 
 OBJS__QUOTED += \
 "EK_TM4C123GXL.obj" \
-"main.obj" \
-"uartstdio.obj" 
+"main.obj" 
 
 C_SRCS__QUOTED += \
 "../EK_TM4C123GXL.c" \
-"../main.c" \
-"C:/ti/tivaware_c_series_2_1_4_178/utils/uartstdio.c" 
+"../main.c" 
 
 

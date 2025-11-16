@@ -12,7 +12,6 @@ GEN_CMDS__FLAG := -l"configPkg/linker.cmd"
 ORDERED_OBJS += \
 "./EK_TM4C123GXL.obj" \
 "./main.obj" \
-"./uartstdio.obj" \
 "../EK_TM4C123GXL.cmd" \
 $(GEN_CMDS__FLAG) \
 -l"C:/ti/tirtos_tivac_2_16_01_14/products/TivaWare_C_Series-2.1.1.71b/grlib/ccs/Debug/grlib.lib" \
@@ -158,8 +157,8 @@ Final.hex: $(EXE_OUTPUTS)
 clean:
 	-$(RM) $(GEN_MISC_FILES__QUOTED)$(EXE_OUTPUTS__QUOTED)$(GEN_FILES__QUOTED)$(BIN_OUTPUTS__QUOTED)$(GEN_OPTS__QUOTED)$(GEN_CMDS__QUOTED)
 	-$(RMDIR) $(GEN_MISC_DIRS__QUOTED)
-	-$(RM) "EK_TM4C123GXL.d" "main.d" "uartstdio.d" 
-	-$(RM) "EK_TM4C123GXL.obj" "main.obj" "uartstdio.obj" 
+	-$(RM) "EK_TM4C123GXL.d" "main.d" 
+	-$(RM) "EK_TM4C123GXL.obj" "main.obj" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

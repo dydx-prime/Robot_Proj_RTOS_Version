@@ -38,6 +38,8 @@
 extern ti_sysbios_knl_Semaphore_Handle command_semaphore;
 extern ti_sysbios_knl_Semaphore_Handle front_semaphore;
 extern ti_sysbios_knl_Semaphore_Handle pid_semaphore;
+extern ti_sysbios_knl_Semaphore_Handle pid_error_semaphore;
+extern ti_sysbios_knl_Semaphore_Handle sensor_semaphore;
 
 
 //------ Globals ---------
@@ -71,6 +73,18 @@ volatile float curr_error = 0.0, prev_error = 0.0, integral_error = 0.0;
 volatile float Kp = 1.2, Ki = 0.05, Kd = 0.05;
 volatile float proportional = 0.0, integral = 0.0, derivative = 0.0, adjustment = 0.0;
 
+// reflect sensooooor
+volatile int reflect_counter = 10;
+
+// ping-pong bufffffffffffffffffffffffffffer
+uint8_t PingPongBuf[2][20];
+uint8_t txBuf = 1;
+uint8_t activateBuf = 0;
+uint8_t sampleIndex = 0;
+volatile uint8_t validCount = 0;
+volatile bool sendPartialFlag = false;
+volatile bool pid_error_flag = false;
+
 // -- function declaration
 void UART_init();
 void ADC_init();
@@ -90,7 +104,70 @@ void pid_func(void);
 void uTurn(void);
 void rightTurn(void);
 float right_calc(void);
+void StorePIDError(float);
+void SendFrameUART(char *Frame);
+void AssembleFrame(uint8_t *buffer);
 
+
+
+void AssembleFrame(uint8_t *buffer){
+	char Frame[100];
+	int offset = 0;
+	strcpy(Frame, "Team##: ");
+	offset = strlen(Frame);
+
+	int i;
+	for (i = 0; i < 20; i++){
+		uint8_t value = buffer[i];
+		uint8_t tens = value / 10;
+		uint8_t ones = value % 10;
+		Frame[offset++] = tens + '0';
+		Frame[offset++] = ones + '0';
+		Frame[offset++] = ' ';
+	}
+	Frame[offset++] = '\r';
+	Frame[offset++] = '\n';
+	Frame[offset++] = '\0';
+
+	SendFrameUART(Frame);
+}
+
+
+void StorePIDError(float curr_error_cm){
+	float mm = curr_error_cm * 10.0f;
+	uint8_t data = (uint8_t) fabs(mm);
+
+	PingPongBuf[activateBuf][sampleIndex++] = data;
+
+	if (sampleIndex >= 20){
+		sampleIndex = 0;
+		Semaphore_post(pid_error_semaphore);
+
+		uint8_t temp = activateBuf;
+		activateBuf = txBuf;
+		txBuf = temp;
+	}
+}
+
+void TransmitTask(UArg arg0, UArg arg1)
+{
+
+    while (1) {
+        Semaphore_pend(pid_error_semaphore, BIOS_WAIT_FOREVER);
+
+        AssembleFrame(PingPongBuf[txBuf]);
+    }
+
+}
+
+
+void SendFrameUART(char *Frame){
+	int i = 0;
+	while (Frame[i] != '\0'){
+		UARTCharPut(UART1_BASE, Frame[i]);
+		i++;
+	}
+}
 
 // typedef struct
 typedef void (*Fn)(void);
@@ -152,6 +229,10 @@ void ADCSeq2IntHandler(void)
 void Timer1AIntHandler(void){
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 	ADCProcessorTrigger(ADC0_BASE, 2);
+	if(pid_error_flag){
+		StorePIDError(curr_error);
+	}
+	pid_error_flag = !pid_error_flag;
 }
 
 void UART0IntHandler(void){
@@ -337,7 +418,7 @@ void Timer1A_init(){
 /*
  *  ======== main ========
  */
-int main(void){
+ int main(void){
 
     FPUEnable();
     FPULazyStackingEnable();
@@ -351,6 +432,14 @@ int main(void){
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
 	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3);
 	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3, GPIO_PIN_3);
+
+	// enable port for Reading Signal
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+	while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOA)){}
+	// SysTick runs full-speed 24-bit timer
+	SysTickEnable();
+	SysTickPeriodSet(0xFFFFFF);
+	SysTickIntDisable();  // do not need SysTick interrupts
 
 	// UART Enable
 	UART_init();
@@ -367,6 +456,59 @@ int main(void){
     BIOS_start();
 
     return (0);
+}
+
+void execute_sensor_task(UArg a0, UArg a1){
+
+	(void)a0; (void)a1;
+
+	while (1) {
+		Semaphore_pend(sensor_semaphore, BIOS_WAIT_FOREVER);
+
+		// 1. set sensor to high as output to charge
+		GPIOPinTypeGPIOOutput(GPIO_PORTA_BASE, GPIO_PIN_2);
+		GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_2, GPIO_PIN_2);
+
+		// 10 us delay
+		volatile int i;
+		for(i = 0; i < 80; i++);   // ~10us at 50 MHz
+
+		// 2. switch pin as input to charge
+		GPIOPinTypeGPIOInput(GPIO_PORTA_BASE, GPIO_PIN_2);
+
+		// 3. time discharge using SysTick
+		uint32_t start = SysTickValueGet();
+		uint32_t stop;
+
+		// maximum wait time (prevents infinite loop)
+		uint32_t timeoutTicks = 100000;
+
+		while(GPIOPinRead(GPIO_PORTA_BASE, GPIO_PIN_2)){
+			Task_yield();
+			stop = SysTickValueGet();
+			if((start - stop) > timeoutTicks){
+				break;
+			}
+		}
+
+		uint32_t reflectance = start - stop; // bigger = darker
+
+		// 4. Send to UART
+		// print reflectance as single byte
+		char buf[32];
+		snprintf(buf, sizeof(buf), "R:%lu\r\n", (unsigned long)reflectance);
+
+		char *p = buf;
+		while(*p) {
+			UARTCharPut(UART1_BASE, *p++);
+		}
+		//UART0_puts(buf);
+	}
+}
+
+void reflectanceTick(UArg arg0)
+{
+    Semaphore_post(sensor_semaphore);   // Wake reflectance task
 }
 
 // implemented tasks
@@ -386,7 +528,7 @@ void execute_cmd_task(UArg a0, UArg a1)
     }
 }
 
-void execute_pid_task(UArg a0, UArg a1)
+void execute_pid_task(UArg a0, UArg a1) // right sensor
 {
     (void)a0; (void)a1;
 
@@ -398,15 +540,13 @@ void execute_pid_task(UArg a0, UArg a1)
         volts1 = ADCAvVal * (3.3 / 4096.0);
         right_distance = 5.0685 * pow(volts1, 2) - 23.329 * volts1 + 31.152;
 
-        /* Use the same logic you had originally */
         if (right_distance > target_distance) {
             rightTurn();
         } else {
             pid_func();
         }
 
-        /* Re-enable ADC interrupt if you rely on it elsewhere (same as before) */
-        ADCIntEnable(ADC0_BASE, 3);
+       // ADCIntEnable(ADC0_BASE, 3);
     }
 }
 
@@ -422,7 +562,7 @@ void execute_front_task(UArg a0, UArg a1)
         volts2 = ADCAvVal2 * (3.3/4096.0);
         front_distance = 5.0685 * pow(volts2, 2) - 23.329 * volts2 + 31.152;
 
-        if (!uTurnStatus && front_distance <= 9) {
+        if (!uTurnStatus && front_distance <= 4.5) {
             uTurnStatus = true;
             uTurn();
         }
@@ -444,7 +584,7 @@ void execute_front_task(UArg a0, UArg a1)
             ADCProcessorTrigger(ADC0_BASE, 3);
         }
 
-        ADCIntEnable(ADC0_BASE, 2);
+       //ADCIntEnable(ADC0_BASE, 2);
     }
 }
 
