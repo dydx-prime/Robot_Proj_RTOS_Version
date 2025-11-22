@@ -44,16 +44,25 @@ extern const ti_sysbios_knl_Task_Handle front_task;
 extern const ti_sysbios_knl_Semaphore_Handle sensor_semaphore;
 
 #include <ti/sysbios/knl/Task.h>
-extern const ti_sysbios_knl_Task_Handle sensor_task;
-
-#include <ti/sysbios/knl/Clock.h>
-extern const ti_sysbios_knl_Clock_Handle reflect_sensor_clock;
+extern const ti_sysbios_knl_Task_Handle reflect_sensor_task;
 
 #include <ti/sysbios/knl/Semaphore.h>
 extern const ti_sysbios_knl_Semaphore_Handle pid_error_semaphore;
 
 #include <ti/sysbios/knl/Task.h>
-extern const ti_sysbios_knl_Task_Handle pid_error_transmit;
+extern const ti_sysbios_knl_Task_Handle pid_error_transmit_task;
+
+#include <ti/sysbios/knl/Semaphore.h>
+extern const ti_sysbios_knl_Semaphore_Handle reflect_sensor_semaphore;
+
+#include <ti/sysbios/knl/Swi.h>
+extern const ti_sysbios_knl_Swi_Handle stopSWI;
+
+#include <ti/sysbios/knl/Task.h>
+extern const ti_sysbios_knl_Task_Handle StorePIDError_task;
+
+#include <ti/sysbios/knl/Semaphore.h>
+extern const ti_sysbios_knl_Semaphore_Handle storePIDError_semaphore;
 
 extern int xdc_runtime_Startup__EXECFXN__C;
 
