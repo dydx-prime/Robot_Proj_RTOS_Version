@@ -481,32 +481,38 @@ void ReflectSensorTimerInit(void){
 
 //------------ reflect sensor functions/tasks ---------------//
 
+uint32_t sensorVal(){
+	// ---- sensor value ----
+	        // charge sensor - PB7
+	        GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, GPIO_PIN_7);
+	        GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_7, GPIO_PIN_7);
+
+	        // charge for 10 microseconds
+	        SysCtlDelay(SysCtlClockGet() / 300000);
+
+	        // set pin as input to discharge
+	        GPIOPinTypeGPIOInput(GPIO_PORTB_BASE, GPIO_PIN_7);
+	        startVal = TimerValueGet(WTIMER1_BASE, TIMER_A);
+
+	        // delay for pin to reach low
+	        while (GPIOPinRead(GPIO_PORTB_BASE, GPIO_PIN_7) != 0) {
+	            endVal = TimerValueGet(WTIMER1_BASE, TIMER_A);
+	            if ( (startVal - endVal) > 300000U) {break;}
+	        }
+	        endVal = TimerValueGet(WTIMER1_BASE, TIMER_A);
+	        return  (startVal-endVal);
+}
+
 void execute_sensor_task(UArg a0, UArg a1){
 
     while (1){
 
         Semaphore_pend(reflect_sensor_semaphore, BIOS_WAIT_FOREVER);
 
-        // ---- sensor value ----
-        // charge sensor - PB7
-        GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, GPIO_PIN_7);
-        GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_7, GPIO_PIN_7);
-
-        // charge for 10 microseconds
-        SysCtlDelay(SysCtlClockGet() / 300000);
-
-        // set pin as input to discharge
-        GPIOPinTypeGPIOInput(GPIO_PORTB_BASE, GPIO_PIN_7);
-        startVal = TimerValueGet(WTIMER1_BASE, TIMER_A);
-
-        // delay for pin to reach low
-        while (GPIOPinRead(GPIO_PORTB_BASE, GPIO_PIN_7) != 0) {
-            endVal = TimerValueGet(WTIMER1_BASE, TIMER_A);
-            if ( (startVal - endVal) > 300000U) {break;}
-        }
-        endVal = TimerValueGet(WTIMER1_BASE, TIMER_A);
-
-        uint32_t sensor_val = (startVal - endVal);
+        uint32_t sensor_val = sensorVal();
+        // 40- 60K FOR WHITE
+        // 150k FOR SINGLE
+        // 300K is THICK
 
         // ---- line detection ----
         if(sensor_val > single_black_threshold){
@@ -636,7 +642,7 @@ void execute_front_task(UArg a0, UArg a1)
         float volts2_squared = volts2 * volts2;
         front_distance = 5.0685 * volts2_squared - 23.329 * volts2 + 31.152;
 
-        if (!uTurnStatus && front_distance <= 4.5f) {
+        if (!uTurnStatus && front_distance <= 6.0f) {
             uTurnStatus = true;
             uTurn();
         }
